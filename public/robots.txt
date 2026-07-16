@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /offline
+
+Sitemap: https://store.fgdev.tech/sitemap.xml

@@ -1,0 +1,118 @@
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.single {
+  grid-template-columns: minmax(0, 780px);
+}
+
+.figure {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  background: rgba(4, 8, 16, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.imageLink {
+  display: block;
+  border-radius: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.frame {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background:
+    linear-gradient(rgba(11, 15, 28, 0.92), rgba(5, 8, 16, 0.96)),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 8px,
+      rgba(255, 255, 255, 0.025) 8px,
+      rgba(255, 255, 255, 0.025) 9px
+    );
+}
+
+.image {
+  width: 100%;
+  height: auto;
+  max-height: 650px;
+  display: block;
+  object-fit: contain;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.imageLink:hover .image {
+  filter: brightness(1.04);
+  transform: scale(1.006);
+}
+
+.badge,
+.zoomHint {
+  position: absolute;
+  top: 10px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 999px;
+  background: rgba(5, 9, 18, 0.84);
+  color: #dbeafe;
+  font-size: 9px;
+  font-weight: 780;
+  letter-spacing: 0.045em;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+}
+
+.badge {
+  left: 10px;
+}
+
+.zoomHint {
+  right: 10px;
+  color: #a5f3fc;
+}
+
+.figure figcaption {
+  margin: 10px 4px 2px;
+  color: #9ba9bf;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.imageLink:focus-visible {
+  outline: 3px solid rgba(103, 232, 249, 0.72);
+  outline-offset: 4px;
+}
+
+@media (max-width: 720px) {
+  .gallery,
+  .single {
+    grid-template-columns: 1fr;
+  }
+
+  .figure {
+    padding: 8px;
+    border-radius: 15px;
+  }
+
+  .frame {
+    min-height: 130px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image {
+    transition: none;
+  }
+}
