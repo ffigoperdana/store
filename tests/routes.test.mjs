@@ -71,7 +71,7 @@ test("health endpoint is uncached and healthy", async () => {
 });
 
 for (const [route, expectedText] of [
-  ["/", "Under"],
+  ["/", "Semua layanan digital"],
   ["/redeem-gpt", "Ikuti 16 langkah"],
   ["/2fa", "2FA Code Generator"],
   ["/offline", "Koneksi internet terputus"],

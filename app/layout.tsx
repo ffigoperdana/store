@@ -6,11 +6,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://store.fgdev.tech"),
   applicationName: "FG Store",
   title: {
-    default: "FG Store — Docs & Security Tools",
+    default: "FG Store — Layanan Digital",
     template: "%s · FG Store",
   },
   description:
-    "Panduan redeem GPT Plus dan generator kode 2FA privat dari FG Store.",
+    "Dashboard layanan digital, dokumentasi GPT, dan generator kode 2FA privat dari FG Store.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -32,21 +32,21 @@ export const metadata: Metadata = {
     locale: "id_ID",
     url: "/",
     siteName: "FG Store",
-    title: "FG Store — Docs & Security Tools",
-    description: "Panduan redeem GPT Plus dan generator kode 2FA privat.",
+    title: "FG Store — Layanan Digital",
+    description: "Dashboard layanan digital, dokumentasi GPT, dan generator kode 2FA privat.",
     images: [
       {
         url: "/og.png",
         width: 1732,
         height: 910,
-        alt: "FG Store — Docs dan 2FA",
+        alt: "FG Store — Layanan Digital",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "FG Store — Docs & Security Tools",
-    description: "Panduan redeem GPT Plus dan generator kode 2FA privat.",
+    title: "FG Store — Layanan Digital",
+    description: "Dashboard layanan digital, dokumentasi GPT, dan generator kode 2FA privat.",
     images: ["/og.png"],
   },
 };
