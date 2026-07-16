@@ -117,6 +117,8 @@ test("tutorial route renders every supplied screenshot with accessible captions"
 
   assert.equal((html.match(/<figure/g) ?? []).length, tutorialAssets.length);
   assert.match(html, /loading="lazy"/);
+  assert.match(html, /src="\/tutorial\/step-13-open-manual-key\.png"/);
+  assert.doesNotMatch(html, /_next\/image\?url=.*step-13-open-manual-key/);
   assert.match(html, /Gambar 8\.4/);
   assert.match(html, /QR pada gambar sengaja disamarkan/);
 });

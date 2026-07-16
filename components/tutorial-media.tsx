@@ -1,4 +1,4 @@
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element */
 import styles from "./tutorial-media.module.css";
 
 type TutorialImage = {
@@ -120,15 +120,15 @@ export function TutorialMedia({ step }: { step: number }) {
             aria-label={`Buka Gambar ${step}.${index + 1} dalam ukuran penuh`}
           >
             <span className={styles.frame}>
-              <Image
+              <img
                 className={styles.image}
                 src={image.src}
                 width={image.width}
                 height={image.height}
                 alt={image.alt}
-                sizes="(max-width: 720px) calc(100vw - 58px), (max-width: 920px) calc(100vw - 140px), 480px"
                 loading="lazy"
                 decoding="async"
+                style={{ aspectRatio: image.width / image.height }}
               />
               <span className={styles.badge} aria-hidden="true">
                 Gambar {step}.{index + 1}
