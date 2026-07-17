@@ -26,6 +26,10 @@ const SENSITIVE_QUERY_KEYS = new Set([
   "token",
 ]);
 
+function isSensitivePath(url) {
+  return /\/(?:admin|checkout|pesanan|api)(?:\/|$)/.test(url.pathname);
+}
+
 function hasSensitiveQuery(url) {
   for (const key of url.searchParams.keys()) {
     if (SENSITIVE_QUERY_KEYS.has(key.toLowerCase())) {
@@ -145,14 +149,14 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     // Query-string navigations may contain TOTP secrets. They always bypass caches.
     event.respondWith(
-      url.search || containsSensitiveQuery
+      url.search || containsSensitiveQuery || isSensitivePath(url)
         ? networkOnlyNavigation(request)
         : networkFirstNavigation(request),
     );
     return;
   }
 
-  if (containsSensitiveQuery) {
+  if (containsSensitiveQuery || isSensitivePath(url)) {
     return;
   }
 

@@ -13,8 +13,8 @@ export function SiteHeader() {
         </Link>
 
         <nav className="desktop-nav" aria-label="Navigasi utama">
-          <Link href="/#catalog">Layanan</Link>
-          <Link href="/redeem-gpt#tutorial">Dokumentasi</Link>
+          <Link href="/#catalog">Katalog</Link>
+          <Link href="/gpt">ChatGPT Plus</Link>
           <Link href="/2fa">2FA Generator</Link>
           <span className="nav-status"><i aria-hidden="true" /> Store aktif</span>
         </nav>
@@ -23,8 +23,8 @@ export function SiteHeader() {
           <summary aria-label="Buka menu navigasi">Menu</summary>
           <nav aria-label="Navigasi seluler">
             <Link href="/">Beranda</Link>
-            <Link href="/#catalog">Layanan</Link>
-            <Link href="/redeem-gpt#tutorial">Dokumentasi</Link>
+            <Link href="/#catalog">Katalog</Link>
+            <Link href="/gpt">ChatGPT Plus</Link>
             <Link href="/2fa">2FA Generator</Link>
           </nav>
         </details>

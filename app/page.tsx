@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { getPublicCatalog } from "@/lib/catalog";
 
 export const metadata: Metadata = {
   title: "Layanan Digital",
@@ -62,7 +63,10 @@ const advantages = [
   ["03", "Privasi diutamakan", "Tool 2FA memproses secret secara lokal di browser."],
 ];
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const catalogProducts = await getPublicCatalog();
   return (
     <div className="site-shell dashboard-shell">
       <SiteHeader />
@@ -71,6 +75,7 @@ export default function Home() {
           <div className="store-grid" aria-hidden="true" />
           <div className="store-orb store-orb-one" aria-hidden="true" />
           <div className="store-orb store-orb-two" aria-hidden="true" />
+          <div className="kinetic-ribbons" aria-hidden="true"><i /><i /><i /></div>
 
           <div className="store-container store-hero-layout">
             <div className="store-copy">
@@ -82,7 +87,7 @@ export default function Home() {
               </p>
               <div className="store-actions">
                 <a className="store-button store-button-primary" href="#catalog">Jelajahi layanan <span aria-hidden="true">→</span></a>
-                <Link className="store-button store-button-secondary" href="/redeem-gpt#tutorial">Panduan GPT</Link>
+                <Link className="store-button store-button-secondary" href="/2fa">Buka 2FA Generator</Link>
               </div>
             </div>
 
@@ -111,15 +116,14 @@ export default function Home() {
               <p>Mulai dari layanan yang sudah siap. Kategori baru akan muncul di dashboard ini tanpa perlu alamat khusus.</p>
             </div>
 
-            <div className="category-row" aria-label="Kategori layanan">
-              <a href="#catalog" className="category-chip active">Semua <b>4</b></a>
-              <a href="#catalog">AI &amp; Produktivitas</a>
-              <a href="#catalog">Keamanan</a>
-              <a href="#updates">Segera hadir</a>
-            </div>
+            <div className="category-row" aria-label="Kategori layanan"><a href="#catalog" className="category-chip active">Semua layanan</a><a href="/gpt">ChatGPT Plus</a><a href="/2fa">Keamanan akun</a></div>
 
-            <div className="product-grid">
-              {products.map((product) => (
+            <div className="product-grid catalog-product-grid">
+              {(catalogProducts.length ? catalogProducts.filter((product) => product.variants.length > 0).map((product) => ({
+                category: product.category || "Digital product", title: product.name, description: product.shortDescription,
+                status: product.variants.some((variant) => variant.available) ? "Tersedia" : "Sold out", statusClass: product.variants.some((variant) => variant.available) ? "ready" : "upcoming",
+                href: product.categorySlug === "chatgpt-plus" ? "/gpt" : `/produk/${product.slug}`, action: product.categorySlug === "chatgpt-plus" ? "Lihat paket" : "Pilih produk", icon: "✦", accent: "cyan",
+              })) : products).map((product) => (
                 <article className="product-card" key={product.title}>
                   <div className="product-card-top">
                     <span className={`product-icon ${product.accent}`} aria-hidden="true">{product.icon}</span>

@@ -1,12 +1,46 @@
 services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fgstore
+      POSTGRES_USER: fgstore
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
+    volumes:
+      - fg_store_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fgstore -d fgstore"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   store:
     build:
       context: .
       dockerfile: Dockerfile
     image: fg-store:local
     restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://fgstore:${POSTGRES_PASSWORD:-local-development-only}@db:5432/fgstore
+      SESSION_SECRET: ${SESSION_SECRET:-local-development-session-secret-change-me-32}
+      INVENTORY_ENCRYPTION_KEY: ${INVENTORY_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-owner@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-this-before-production}
+      ADMIN_NAME: ${ADMIN_NAME:-FG Store Owner}
+      STORE_WHATSAPP: ${STORE_WHATSAPP:-6281234567890}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      ALLOW_MOCK_PAY: "true"
+      COOKIE_SECURE: "false"
+      KLIKQRIS_ENV: ${KLIKQRIS_ENV:-sandbox}
+      KLIKQRIS_MODE: ${KLIKQRIS_MODE:-PG}
+      KLIKQRIS_API_KEY: ${KLIKQRIS_API_KEY:-}
+      KLIKQRIS_MERCHANT_ID: ${KLIKQRIS_MERCHANT_ID:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
     ports:
       - "${PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test:
         - CMD
@@ -17,3 +51,6 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
+
+volumes:
+  fg_store_postgres:

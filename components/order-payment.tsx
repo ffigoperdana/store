@@ -1,0 +1,15 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+type OrderData = { order: { number: string; status: string; totalAmount: number; expiresAt: string; whatsappUrl: string | null }; payment: { status: string; provider: string; qrImage: string | null; qrUrl: string | null; totalAmount: number } | null; items: Array<{ productName: string; variantName: string; fulfillmentMode: string }>; delivery: Array<{ label: string; value: string }> };
+
+export function OrderPayment({ token }: { token: string }) {
+  const [data, setData] = useState<OrderData | null>(null); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => { const response = await fetch(`/api/orders/${token}`, { cache: "no-store" }); const json = await response.json(); if (!response.ok) setError(json.error || "Pesanan tidak ditemukan."); else setData(json); }, [token]);
+  useEffect(() => { void load(); const timer = window.setInterval(() => void load(), 8000); return () => window.clearInterval(timer); }, [load]);
+  if (error) return <p className="form-error">{error}</p>; if (!data) return <p className="loading-copy">Memuat pesanan aman…</p>;
+  const paid = ["PAID", "FULFILLED"].includes(data.order.status);
+  async function mockPay() { setBusy(true); await fetch(`/api/dev/orders/${token}/pay`, { method: "POST" }); await load(); setBusy(false); }
+  return <section className="payment-card"><p className="eyebrow">ORDER {data.order.number}</p><h1>{paid ? "Pembayaran terverifikasi" : "Selesaikan pembayaran"}</h1><p>{data.items.map((item) => `${item.productName} — ${item.variantName}`).join(", ")}</p><div className="payment-total"><span>Total tagihan</span><strong>Rp{data.payment?.totalAmount.toLocaleString("id-ID")}</strong></div>{!paid && <><div className="qris-placeholder">{data.payment?.qrImage ? <img src={data.payment.qrImage} alt="Kode QR pembayaran" /> : <><span>QRIS</span><small>Tagihan dibuat. Provider payment akan menampilkan QR di sini.</small></>}</div>{data.payment?.qrUrl && <a className="store-button store-button-secondary" href={data.payment.qrUrl} target="_blank">Buka QR pembayaran</a>}{process.env.NODE_ENV !== "production" && data.payment?.provider === "mock" && <button className="store-button store-button-primary" onClick={() => void mockPay()} disabled={busy}>{busy ? "Memproses…" : "Simulasikan callback pembayaran"}</button>}<p className="checkout-note">Tombol WhatsApp akan aktif otomatis setelah gateway mengirim callback sukses.</p></>}{paid && <><div className="payment-success">✓ Pembayaran sukses. {data.delivery.length ? "Akses digital sudah siap." : "Admin akan mengirimkan pesanan lewat WhatsApp."}</div>{data.delivery.map((delivery) => <div className="delivery-value" key={delivery.value}><span>{delivery.label}</span><code>{delivery.value}</code><button onClick={() => navigator.clipboard.writeText(delivery.value)}>Salin</button></div>)}{data.order.whatsappUrl && <a className="whatsapp-button" href={data.order.whatsappUrl} target="_blank" rel="noreferrer">Lanjut WhatsApp Admin</a>}</>}</section>;
+}
