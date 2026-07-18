@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AdminProductManager } from "@/components/admin-product-manager";
 import { AdminEmailAction } from "@/components/admin-email-action";
+import { AdminMobileNav } from "@/components/admin-mobile-nav";
 import { getAdminSession } from "@/lib/auth";
 import { getAdminDashboardData } from "@/lib/admin-data";
 
@@ -27,6 +28,15 @@ const statusLabels: Record<string, string> = {
   REFUNDED: "Refund",
 };
 
+const adminLinks = [
+  ["01", "Ringkasan", "#overview"],
+  ["02", "Pesanan & pembeli", "#orders"],
+  ["03", "Kategori", "#categories"],
+  ["04", "Paket ChatGPT", "#gpt-products"],
+  ["05", "Semua produk", "#products"],
+  ["06", "Varian & stok", "#new-variant"],
+] as const;
+
 function statusTone(status: string | null) {
   if (!status) return "neutral";
   if (["PAID", "FULFILLED"].includes(status)) return "success";
@@ -43,15 +53,11 @@ export default async function AdminPage() {
   return (
     <main className="admin-shell">
       <aside className="admin-sidebar">
-        <Link className="admin-brand" href="/"><b>FG</b><span>Store</span><small>Admin console</small></Link>
-        <nav aria-label="Navigasi admin">
-          <a href="#overview"><span>01</span>Ringkasan</a>
-          <a href="#orders"><span>02</span>Pesanan & pembeli</a>
-          <a href="#categories"><span>03</span>Kategori</a>
-          <a href="#gpt-products"><span>04</span>Paket ChatGPT</a>
-          <a href="#products"><span>05</span>Semua produk</a>
-          <a href="#new-variant"><span>06</span>Stok & fulfilment</a>
+        <Link className="admin-brand" href="/"><b>FG</b><span>FG Store</span><small>Admin console</small></Link>
+        <nav className="admin-desktop-nav" aria-label="Navigasi admin">
+          {adminLinks.map(([number, label, href]) => <a key={href} href={href}><span>{number}</span>{label}</a>)}
         </nav>
+        <AdminMobileNav links={adminLinks} />
         <div className="admin-sidebar-foot">
           <span>Login sebagai</span>
           <strong>{user.name}</strong>
