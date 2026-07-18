@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { products } from "@/db/schema";
+import { productVariants, products } from "@/db/schema";
 import { assertSameOrigin, requireAdmin } from "@/lib/auth";
 
 const schema = z.object({
@@ -20,4 +20,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!updated) return NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
     return NextResponse.json(updated);
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Produk gagal diperbarui." }, { status: 400 }); }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    assertSameOrigin(request); await requireAdmin(); if (!db) throw new Error("Database belum terhubung.");
+    const { id } = await params;
+    const [archived] = await db.transaction(async (tx) => {
+      await tx.update(productVariants).set({ status: "ARCHIVED", updatedAt: new Date() }).where(eq(productVariants.productId, id));
+      return tx.update(products).set({ publicationStatus: "ARCHIVED", availabilityMode: "FORCE_SOLD_OUT", updatedAt: new Date() }).where(eq(products.id, id)).returning();
+    });
+    return archived ? NextResponse.json({ archived: true }) : NextResponse.json({ error: "Produk tidak ditemukan." }, { status: 404 });
+  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "Produk gagal dihapus." }, { status: 400 }); }
 }

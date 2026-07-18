@@ -14,6 +14,19 @@ export type PaymentResponse = {
   raw: Record<string, unknown>;
 };
 
+function klikQrisConfig() {
+  const apiKey = process.env.KLIKQRIS_API_KEY?.trim();
+  const merchantId = process.env.KLIKQRIS_MERCHANT_ID?.trim();
+  if (!apiKey || !merchantId) throw new Error("KlikQRIS credentials are not configured.");
+  const sandbox = process.env.KLIKQRIS_ENV === "sandbox";
+  const mode = process.env.KLIKQRIS_MODE === "MYPG" ? "MYPG" : "PG";
+  const resource = mode === "MYPG" ? "qrisv2" : "qris";
+  const baseUrl = sandbox
+    ? `https://klikqris.com/api/sandbox/${resource}`
+    : `https://klikqris.com/api/${resource}`;
+  return { apiKey, merchantId, baseUrl };
+}
+
 function getValue(source: Record<string, unknown>, ...keys: string[]) {
   for (const key of keys) {
     const value = source[key];
@@ -41,19 +54,19 @@ export async function createPayment(request: PaymentRequest): Promise<PaymentRes
     };
   }
 
-  const apiKey = process.env.KLIKQRIS_API_KEY;
-  const merchantId = process.env.KLIKQRIS_MERCHANT_ID;
-  if (!apiKey || !merchantId) throw new Error("KlikQRIS credentials are not configured.");
-  const sandbox = process.env.KLIKQRIS_ENV === "sandbox";
-  const mode = process.env.KLIKQRIS_MODE === "MYPG" ? "MYPG" : "PG";
-  const endpoint = sandbox
-    ? "https://klikqris.com/api/sandbox/qris/create"
-    : `https://klikqris.com/api/${mode === "MYPG" ? "qrisv2" : "qris"}/create`;
-  const response = await fetch(endpoint, {
+  const { apiKey, merchantId, baseUrl } = klikQrisConfig();
+  const response = await fetch(`${baseUrl}/create`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": apiKey, id_merchant: merchantId },
-    body: JSON.stringify({ amount: request.amount, order_id: request.orderNumber, description: request.description, callback_url: request.callbackUrl }),
+    body: JSON.stringify({
+      order_id: request.orderNumber,
+      amount: request.amount,
+      id_merchant: merchantId,
+      keterangan: request.description,
+      callback_url: request.callbackUrl,
+    }),
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   const raw = (await response.json().catch(() => ({}))) as Record<string, unknown>;
   if (!response.ok || raw.status === false) throw new Error(String(raw.message ?? "KlikQRIS could not create a payment."));
@@ -73,6 +86,19 @@ export async function createPayment(request: PaymentRequest): Promise<PaymentRes
     expiresAt: Number.isNaN(expiresAt.valueOf()) ? new Date(Date.now() + 15 * 60 * 1000) : expiresAt,
     raw,
   };
+}
+
+export async function checkPaymentStatus(providerOrderId: string) {
+  const { apiKey, merchantId, baseUrl } = klikQrisConfig();
+  const response = await fetch(`${baseUrl}/status/${encodeURIComponent(providerOrderId)}`, {
+    method: "GET",
+    headers: { "x-api-key": apiKey, id_merchant: merchantId },
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+  const raw = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!response.ok || raw.status === false) throw new Error(String(raw.message ?? "KlikQRIS could not check the payment status."));
+  return (raw.data && typeof raw.data === "object" ? raw.data : raw) as Record<string, unknown>;
 }
 
 export function normalizeProviderStatus(payload: Record<string, unknown>) {

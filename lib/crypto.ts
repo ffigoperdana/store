@@ -27,6 +27,12 @@ export async function verifyPassword(password: string, stored: string) {
   return wanted.length === actual.length && timingSafeEqual(wanted, actual);
 }
 
+export function safeSecretEqual(actual: string, expected: string) {
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
 function inventoryKey() {
   const configured = process.env.INVENTORY_ENCRYPTION_KEY;
   if (!configured) {

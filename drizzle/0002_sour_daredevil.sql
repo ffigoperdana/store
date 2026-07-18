@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "delivery_email_provider_id" varchar(160);

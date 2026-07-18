@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { products, productVariants } from "@/db/schema";
+import { categories, inventoryItems, products, productVariants } from "@/db/schema";
 import { assertSameOrigin, requireAdmin } from "@/lib/auth";
+import { ensureStoreBootstrap } from "@/lib/store-bootstrap";
 
 const productSchema = z.object({
   name: z.string().trim().min(2).max(120), slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/),
@@ -17,11 +18,28 @@ export async function GET() {
   try {
     await requireAdmin();
     if (!db) throw new Error("Database belum terhubung.");
-    const rows = await db.select({ product: products, variant: productVariants }).from(products).leftJoin(productVariants, eq(productVariants.productId, products.id)).orderBy(desc(products.updatedAt));
-    const grouped = new Map<string, typeof rows[number]["product"] & { variants: Array<NonNullable<typeof rows[number]["variant"]>> }>();
+    await ensureStoreBootstrap();
+    const [rows, inventoryCounts] = await Promise.all([
+      db.select({ product: products, variant: productVariants, category: categories }).from(products).leftJoin(categories, eq(products.categoryId, categories.id)).leftJoin(productVariants, eq(productVariants.productId, products.id)).orderBy(desc(products.updatedAt)),
+      db.select({ variantId: inventoryItems.variantId, status: inventoryItems.status, count: sql<number>`count(*)::int` }).from(inventoryItems).groupBy(inventoryItems.variantId, inventoryItems.status),
+    ]);
+    const counts = new Map<string, { available: number; delivered: number; reserved: number }>();
+    for (const row of inventoryCounts) {
+      const current = counts.get(row.variantId) ?? { available: 0, delivered: 0, reserved: 0 };
+      if (row.status === "AVAILABLE") current.available = row.count;
+      if (row.status === "DELIVERED") current.delivered = row.count;
+      if (row.status === "RESERVED") current.reserved = row.count;
+      counts.set(row.variantId, current);
+    }
+    type SafeVariant = Omit<typeof productVariants.$inferSelect, "sharedDeliveryValue"> & { sharedDeliveryConfigured: boolean; availableInventory: number; deliveredInventory: number; reservedInventory: number };
+    const grouped = new Map<string, typeof rows[number]["product"] & { categoryName: string | null; categorySlug: string | null; variants: SafeVariant[] }>();
     for (const row of rows) {
-      const product = grouped.get(row.product.id) ?? { ...row.product, variants: [] };
-      if (row.variant) product.variants.push(row.variant);
+      const product = grouped.get(row.product.id) ?? { ...row.product, categoryName: row.category?.name ?? null, categorySlug: row.category?.slug ?? null, variants: [] };
+      if (row.variant) {
+        const { sharedDeliveryValue, ...safeVariant } = row.variant;
+        const inventory = counts.get(row.variant.id) ?? { available: 0, delivered: 0, reserved: 0 };
+        product.variants.push({ ...safeVariant, sharedDeliveryConfigured: row.variant.fulfillmentMode === "SINGLE_SHARED" && Boolean(sharedDeliveryValue), availableInventory: inventory.available, deliveredInventory: inventory.delivered, reservedInventory: inventory.reserved });
+      }
       grouped.set(row.product.id, product);
     }
     return NextResponse.json([...grouped.values()]);

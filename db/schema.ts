@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  index,
   jsonb,
   pgEnum,
   pgTable,
@@ -26,6 +27,7 @@ export const fulfillmentMode = pgEnum("fulfillment_mode", ["MANUAL_WHATSAPP", "S
 export const inventoryStatus = pgEnum("inventory_status", ["AVAILABLE", "RESERVED", "DELIVERED", "INVALID", "REVOKED"]);
 export const orderStatus = pgEnum("order_status", ["AWAITING_PAYMENT", "PAID", "FULFILLING", "FULFILLED", "MANUAL_REVIEW", "EXPIRED", "CANCELLED"]);
 export const paymentStatus = pgEnum("payment_status", ["PENDING", "PAID", "EXPIRED", "FAILED", "AMOUNT_MISMATCH", "REFUNDED"]);
+export const emailDeliveryStatus = pgEnum("email_delivery_status", ["NOT_REQUESTED", "PENDING", "SENDING", "SENT", "FAILED", "SKIPPED"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -108,6 +110,7 @@ export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
   orderNumber: varchar("order_number", { length: 64 }).notNull().unique(),
   publicToken: varchar("public_token", { length: 96 }).notNull().unique(),
+  checkoutKey: varchar("checkout_key", { length: 64 }).unique(),
   buyerName: varchar("buyer_name", { length: 140 }).notNull(),
   buyerWhatsapp: varchar("buyer_whatsapp", { length: 32 }).notNull(),
   buyerEmail: varchar("buyer_email", { length: 320 }),
@@ -119,6 +122,11 @@ export const orders = pgTable("orders", {
   paidAt: timestamp("paid_at", { withTimezone: true }),
   fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
   whatsappOpenedAt: timestamp("whatsapp_opened_at", { withTimezone: true }),
+  deliveryEmailStatus: emailDeliveryStatus("delivery_email_status").notNull().default("NOT_REQUESTED"),
+  deliveryEmailProviderId: varchar("delivery_email_provider_id", { length: 160 }),
+  deliveryEmailSentAt: timestamp("delivery_email_sent_at", { withTimezone: true }),
+  deliveryEmailAttempts: integer("delivery_email_attempts").notNull().default(0),
+  deliveryEmailLastError: text("delivery_email_last_error"),
   ...timestamps,
 });
 
@@ -177,6 +185,19 @@ export const webhookEvents = pgTable("webhook_events", {
   error: text("error"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const rateLimitBuckets = pgTable("rate_limit_buckets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  scope: varchar("scope", { length: 48 }).notNull(),
+  keyHash: varchar("key_hash", { length: 128 }).notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  hits: integer("hits").notNull().default(1),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("rate_limit_scope_key_window_unique").on(table.scope, table.keyHash, table.windowStart),
+  index("rate_limit_expires_at_idx").on(table.expiresAt),
+]);
 
 export const auditLogs = pgTable("audit_logs", {
   id: uuid("id").defaultRandom().primaryKey(),

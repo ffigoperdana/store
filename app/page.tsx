@@ -1,72 +1,47 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CatalogBrowser } from "@/components/catalog-browser";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { getPublicCatalog } from "@/lib/catalog";
+import { getPublicCatalog, getPublicCategories } from "@/lib/catalog";
 
 export const metadata: Metadata = {
   title: "Layanan Digital",
   description:
-    "Dashboard layanan digital FG Store. Temukan produk, panduan, dan fitur keamanan dalam satu tempat.",
+    "Katalog layanan digital FG Store. Temukan produk, paket, panduan, dan fitur keamanan dalam satu tempat.",
 };
-
-const products = [
-  {
-    category: "AI & Produktivitas",
-    title: "ChatGPT Plus",
-    description: "Panduan redeem dan pengamanan akun untuk pelanggan GPT Plus.",
-    status: "Tersedia",
-    statusClass: "ready",
-    href: "/redeem-gpt#tutorial",
-    action: "Lihat panduan",
-    icon: "✦",
-    accent: "cyan",
-  },
-  {
-    category: "Keamanan",
-    title: "2FA Code Generator",
-    description: "Generator kode TOTP privat yang berjalan langsung di perangkatmu.",
-    status: "Tersedia",
-    statusClass: "ready",
-    href: "/2fa",
-    action: "Buka generator",
-    icon: "⌘",
-    accent: "violet",
-  },
-  {
-    category: "Streaming",
-    title: "Entertainment Hub",
-    description: "Ruang untuk layanan hiburan digital FG Store berikutnya.",
-    status: "Segera hadir",
-    statusClass: "upcoming",
-    href: "#updates",
-    action: "Ikuti update",
-    icon: "◉",
-    accent: "pink",
-  },
-  {
-    category: "Tools & Utility",
-    title: "Digital Essentials",
-    description: "Kategori baru untuk kebutuhan tools dan produktivitas digital.",
-    status: "Segera hadir",
-    statusClass: "upcoming",
-    href: "#updates",
-    action: "Lihat roadmap",
-    icon: "↗",
-    accent: "amber",
-  },
-];
 
 const advantages = [
   ["01", "Mobile-first", "Nyaman digunakan dari layar kecil sampai desktop."],
-  ["02", "Jelas & terarah", "Status layanan dan akses panduan selalu terlihat."],
+  ["02", "Jelas & terarah", "Status produk dan akses panduan selalu terlihat."],
   ["03", "Privasi diutamakan", "Tool 2FA memproses secret secara lokal di browser."],
 ];
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const catalogProducts = await getPublicCatalog();
+  const [catalogProducts, categories] = await Promise.all([
+    getPublicCatalog(),
+    getPublicCategories(),
+  ]);
+  const visibleProducts = catalogProducts.filter((product) => product.variants.length > 0);
+  const availableProducts = visibleProducts.filter((product) =>
+    product.variants.some((variant) => variant.available),
+  );
+  const totalVariants = visibleProducts.reduce(
+    (total, product) => total + product.variants.length,
+    0,
+  );
+  const availabilityPercent = visibleProducts.length
+    ? Math.round((availableProducts.length / visibleProducts.length) * 100)
+    : 0;
+  const categorySummaries = categories.map((category) => ({
+    ...category,
+    productCount: visibleProducts.filter(
+      (product) => product.categorySlug === category.slug,
+    ).length,
+  }));
+
   return (
     <div className="site-shell dashboard-shell">
       <SiteHeader />
@@ -82,8 +57,8 @@ export default async function Home() {
               <p className="store-kicker"><span aria-hidden="true" /> FG STORE / DIGITAL HUB</p>
               <h1 id="store-title">Semua layanan digital,<br /><em>satu tempat.</em></h1>
               <p className="store-lead">
-                Dashboard FG Store untuk menemukan produk, mengakses panduan,
-                dan mengelola kebutuhan digitalmu dengan lebih mudah.
+                Temukan berbagai produk digital, pilih paket yang sesuai, lalu
+                selesaikan pembayaran dalam alur yang ringkas dan transparan.
               </p>
               <div className="store-actions">
                 <a className="store-button store-button-primary" href="#catalog">Jelajahi layanan <span aria-hidden="true">→</span></a>
@@ -91,15 +66,34 @@ export default async function Home() {
               </div>
             </div>
 
-            <aside className="store-console" aria-label="Ringkasan layanan FG Store">
-              <div className="console-top"><span className="console-dots" aria-hidden="true"><i /><i /><i /></span><span>fg-store / overview</span><b>LIVE</b></div>
+            <aside className="store-console" aria-label="Ringkasan katalog FG Store">
+              <div className="console-top">
+                <span className="console-dots" aria-hidden="true"><i /><i /><i /></span>
+                <span>fg-store / catalog</span>
+                <b>LIVE</b>
+              </div>
               <div className="console-content">
-                <p>LAYANAN AKTIF</p>
-                <strong>02<span>/04</span></strong>
-                <div className="console-bar" aria-label="Dua dari empat kategori siap"><i /></div>
+                <p>RINGKASAN KATALOG</p>
+                <strong>{String(visibleProducts.length).padStart(2, "0")}<span> produk</span></strong>
+                <div className="console-metrics" aria-label="Statistik katalog saat ini">
+                  <span><b>{categories.length}</b>Kategori</span>
+                  <span><b>{totalVariants}</b>Pilihan paket</span>
+                  <span><b>{availableProducts.length}</b>Siap dibeli</span>
+                </div>
+                <div className="console-bar" aria-label={`${availabilityPercent}% produk tersedia`}>
+                  <i style={{ width: `${availabilityPercent}%` }} />
+                </div>
                 <div className="console-list">
-                  <span><i className="active" />GPT &amp; Security <b>Aktif</b></span>
-                  <span><i />Kategori baru <b>Dalam persiapan</b></span>
+                  {categorySummaries.slice(0, 3).map((category) => (
+                    <span key={category.id}>
+                      <i className={category.productCount ? "active" : undefined} />
+                      {category.name}
+                      <b>{category.productCount} produk</b>
+                    </span>
+                  ))}
+                  {!categorySummaries.length && (
+                    <span><i />Katalog belum tersedia <b>Menunggu data</b></span>
+                  )}
                 </div>
               </div>
             </aside>
@@ -113,29 +107,10 @@ export default async function Home() {
                 <p className="eyebrow">Katalog layanan</p>
                 <h2 id="catalog-title">Pilih yang kamu butuhkan.</h2>
               </div>
-              <p>Mulai dari layanan yang sudah siap. Kategori baru akan muncul di dashboard ini tanpa perlu alamat khusus.</p>
+              <p>Kategori dan produk di bawah ini mengikuti data yang kamu kelola dari dashboard admin.</p>
             </div>
 
-            <div className="category-row" aria-label="Kategori layanan"><a href="#catalog" className="category-chip active">Semua layanan</a><a href="/gpt">ChatGPT Plus</a><a href="/2fa">Keamanan akun</a></div>
-
-            <div className="product-grid catalog-product-grid">
-              {(catalogProducts.length ? catalogProducts.filter((product) => product.variants.length > 0).map((product) => ({
-                category: product.category || "Digital product", title: product.name, description: product.shortDescription,
-                status: product.variants.some((variant) => variant.available) ? "Tersedia" : "Sold out", statusClass: product.variants.some((variant) => variant.available) ? "ready" : "upcoming",
-                href: product.categorySlug === "chatgpt-plus" ? "/gpt" : `/produk/${product.slug}`, action: product.categorySlug === "chatgpt-plus" ? "Lihat paket" : "Pilih produk", icon: "✦", accent: "cyan",
-              })) : products).map((product) => (
-                <article className="product-card" key={product.title}>
-                  <div className="product-card-top">
-                    <span className={`product-icon ${product.accent}`} aria-hidden="true">{product.icon}</span>
-                    <span className={`availability ${product.statusClass}`}><i aria-hidden="true" />{product.status}</span>
-                  </div>
-                  <p className="product-category">{product.category}</p>
-                  <h3>{product.title}</h3>
-                  <p className="product-description">{product.description}</p>
-                  <Link className="product-link" href={product.href}>{product.action} <span aria-hidden="true">→</span></Link>
-                </article>
-              ))}
-            </div>
+            <CatalogBrowser categories={categories} products={visibleProducts} />
           </div>
         </section>
 
@@ -143,9 +118,9 @@ export default async function Home() {
           <div className="store-container lower-grid">
             <div className="update-card">
               <p className="eyebrow">FG Store update</p>
-              <h2 id="updates-title">Dashboard ini akan terus bertumbuh.</h2>
-              <p>Produk baru akan ditambahkan ke katalog utama agar semua layanan tetap mudah ditemukan dari beranda.</p>
-              <span className="update-note"><i aria-hidden="true" /> Saat ini: Docs GPT &amp; 2FA aktif</span>
+              <h2 id="updates-title">Katalog yang mengikuti kebutuhanmu.</h2>
+              <p>Produk baru yang dipublikasikan dari admin akan otomatis masuk ke kategori yang tepat di beranda.</p>
+              <span className="update-note"><i aria-hidden="true" /> Saat ini: {visibleProducts.length} produk dalam {categories.length} kategori</span>
             </div>
             <div className="advantage-list">
               {advantages.map(([number, title, copy]) => (

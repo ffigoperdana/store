@@ -36,6 +36,17 @@ services:
       KLIKQRIS_API_KEY: ${KLIKQRIS_API_KEY:-}
       KLIKQRIS_MERCHANT_ID: ${KLIKQRIS_MERCHANT_ID:-}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      CHECKOUT_RATE_LIMIT_WINDOW_SECONDS: ${CHECKOUT_RATE_LIMIT_WINDOW_SECONDS:-600}
+      CHECKOUT_RATE_LIMIT_IP_MAX: ${CHECKOUT_RATE_LIMIT_IP_MAX:-12}
+      CHECKOUT_RATE_LIMIT_PHONE_MAX: ${CHECKOUT_RATE_LIMIT_PHONE_MAX:-5}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-disabled}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-FG Store <orders@mail.fgdev.tech>}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+      # Docker-local showcase only. Coolify uses the Dockerfile and remains clean.
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      AUTO_SEED_CATALOG: ${AUTO_SEED_CATALOG:-true}
     ports:
       - "${PORT:-3000}:3000"
     depends_on:

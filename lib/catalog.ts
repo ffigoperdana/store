@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { categories, inventoryItems, productVariants, products } from "@/db/schema";
 import { ensureStarterCatalog } from "@/lib/store-bootstrap";
@@ -31,15 +31,45 @@ export type PublicProduct = {
   variants: PublicVariant[];
 };
 
+export type PublicCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+};
+
+export async function getPublicCategories(): Promise<PublicCategory[]> {
+  if (!db) return [];
+  await ensureStarterCatalog();
+  return db
+    .select({
+      id: categories.id,
+      name: categories.name,
+      slug: categories.slug,
+      description: categories.description,
+    })
+    .from(categories)
+    .where(eq(categories.hidden, false))
+    .orderBy(asc(categories.sortOrder), asc(categories.name));
+}
+
 export async function getPublicCatalog(): Promise<PublicProduct[]> {
   if (!db) return [];
   await ensureStarterCatalog();
+  // Keep an abandoned QR checkout from making the last pool item look sold
+  // out forever. The checkout path performs the same cleanup under lock.
+  await db.update(inventoryItems).set({
+    status: "AVAILABLE",
+    reservedOrderId: null,
+    reservedUntil: null,
+    updatedAt: new Date(),
+  }).where(and(eq(inventoryItems.status, "RESERVED"), lt(inventoryItems.reservedUntil, new Date())));
   const rows = await db
     .select({ product: products, variant: productVariants, category: categories })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(productVariants, and(eq(productVariants.productId, products.id), eq(productVariants.status, "ACTIVE")))
-    .where(eq(products.publicationStatus, "PUBLISHED"))
+    .where(and(eq(products.publicationStatus, "PUBLISHED"), or(isNull(categories.id), eq(categories.hidden, false))))
     .orderBy(asc(products.sortOrder), asc(products.name), asc(productVariants.name));
 
   const uniqueIds = rows
@@ -83,7 +113,7 @@ export async function getPublicCatalog(): Promise<PublicProduct[]> {
         channel: variant.channel,
         estimatedProcess: variant.estimatedProcess,
         fulfillmentMode: variant.fulfillmentMode,
-        available: remaining === null || remaining > 0,
+        available: row.product.availabilityMode === "FORCE_SOLD_OUT" ? false : remaining === null || remaining > 0,
         remaining,
       });
     }
