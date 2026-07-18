@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CatalogBrowser } from "@/components/catalog-browser";
+import { FloatingPaymentAction } from "@/components/floating-payment-action";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getPublicCatalog, getPublicCategories } from "@/lib/catalog";
@@ -133,6 +134,7 @@ export default async function Home() {
         </section>
       </main>
       <SiteFooter />
+      <FloatingPaymentAction />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { and, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   inventoryItems,
@@ -11,13 +11,25 @@ import {
 } from "@/db/schema";
 import { decryptSecret, encryptSecret, randomToken, safeSecretEqual, sha256 } from "@/lib/crypto";
 import { escapeEmailHtml, sendTransactionalEmail } from "@/lib/email";
-import { checkPaymentStatus, createPayment, normalizeProviderStatus } from "@/lib/payment-provider";
+import { checkPaymentStatus, createPayment, normalizeProviderStatus, paymentExpiryMilliseconds } from "@/lib/payment-provider";
 
-type CheckoutInput = { checkoutKey: string; variantId: string; buyerName: string; buyerWhatsapp: string; buyerEmail?: string; origin: string };
+type CheckoutInput = { checkoutKey: string; browserKey: string; variantId: string; buyerName: string; buyerWhatsapp: string; buyerEmail?: string; origin: string };
 type DeliveryEntry = { label: string; value: string; kind: "url" | "code" };
 type CustomerItem = { item: typeof orderItems.$inferSelect; variant: typeof productVariants.$inferSelect | null };
 
 const ORDER_PREFIX = "FGS";
+
+export class ActiveCheckoutError extends Error {
+  constructor(public readonly publicToken: string) {
+    super("Masih ada pembayaran yang menunggu. Selesaikan atau tunggu tagihan sebelumnya berakhir terlebih dahulu.");
+  }
+}
+
+export class CancellationLimitError extends Error {
+  constructor() {
+    super("Batas pembatalan pembayaran untuk browser ini sudah tercapai. Tunggu tagihan aktif berakhir otomatis.");
+  }
+}
 
 function orderNumber() {
   const date = new Date().toISOString().slice(0, 10).replaceAll("-", "");
@@ -89,18 +101,31 @@ export async function createCheckout(input: CheckoutInput) {
 
   const publicToken = randomToken(24);
   const number = orderNumber();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + paymentExpiryMilliseconds());
   const buyerWhatsapp = normalizeWhatsapp(input.buyerWhatsapp);
   let orderId = "";
   let reserved = false;
 
   await db.transaction(async (tx) => {
+    // Serialize checkout creation for a browser key. This guards the small
+    // window where two tabs submit different idempotency keys at once.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.browserKey}))`);
+    const active = await tx.query.orders.findFirst({
+      where: and(
+        eq(orders.browserKey, input.browserKey),
+        eq(orders.status, "AWAITING_PAYMENT"),
+        gt(orders.expiresAt, new Date()),
+      ),
+      orderBy: [desc(orders.createdAt)],
+    });
+    if (active) throw new ActiveCheckoutError(active.publicToken);
     const [order] = await tx
       .insert(orders)
       .values({
         orderNumber: number,
         publicToken,
         checkoutKey: input.checkoutKey,
+        browserKey: input.browserKey,
         buyerName: input.buyerName.trim(),
         buyerWhatsapp,
         buyerEmail: input.buyerEmail?.trim().toLowerCase() || null,
@@ -193,6 +218,60 @@ export async function createCheckout(input: CheckoutInput) {
     throw error;
   }
   return { publicToken, orderNumber: number, reused: false };
+}
+
+export async function getActiveCheckoutForBrowser(browserKey: string) {
+  if (!db) return null;
+  const order = await db.query.orders.findFirst({
+    where: and(
+      eq(orders.browserKey, browserKey),
+      eq(orders.status, "AWAITING_PAYMENT"),
+      gt(orders.expiresAt, new Date()),
+    ),
+    orderBy: [desc(orders.createdAt)],
+  });
+  if (!order) return null;
+  const [item, cancelled] = await Promise.all([
+    db.query.orderItems.findFirst({ where: eq(orderItems.orderId, order.id) }),
+    db.select({ count: sql<number>`count(*)::int` }).from(orders).where(and(
+      eq(orders.browserKey, browserKey),
+      sql`${orders.customerCancelledAt} is not null`,
+    )),
+  ]);
+  return {
+    token: order.publicToken,
+    number: order.orderNumber,
+    expiresAt: order.expiresAt,
+    productName: item?.productName || "Produk digital",
+    variantName: item?.variantName || "",
+    cancellationsRemaining: Math.max(0, 3 - (cancelled[0]?.count || 0)),
+  };
+}
+
+export async function cancelCheckoutForBrowser(publicToken: string, browserKey: string) {
+  if (!db) throw new Error("Store database is not configured.");
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${browserKey}))`);
+    const order = await tx.query.orders.findFirst({ where: and(eq(orders.publicToken, publicToken), eq(orders.browserKey, browserKey)) });
+    if (!order) throw new Error("Sesi pembayaran tidak ditemukan di browser ini.");
+    if (order.status !== "AWAITING_PAYMENT" || order.expiresAt <= new Date()) throw new Error("Tagihan ini sudah tidak dapat dibatalkan.");
+    const [countRow] = await tx.select({ count: sql<number>`count(*)::int` }).from(orders).where(and(
+      eq(orders.browserKey, browserKey),
+      sql`${orders.customerCancelledAt} is not null`,
+    ));
+    if ((countRow?.count || 0) >= 3) throw new CancellationLimitError();
+    const [updated] = await tx.update(orders).set({
+      status: "CANCELLED",
+      customerCancelledAt: new Date(),
+      updatedAt: new Date(),
+    }).where(and(eq(orders.id, order.id), eq(orders.status, "AWAITING_PAYMENT"))).returning({ id: orders.id });
+    if (!updated) throw new Error("Status tagihan sudah berubah. Muat ulang halaman untuk melihat status terbaru.");
+    await tx.update(inventoryItems).set({ status: "AVAILABLE", reservedOrderId: null, reservedUntil: null, updatedAt: new Date() }).where(and(
+      eq(inventoryItems.reservedOrderId, order.id),
+      eq(inventoryItems.status, "RESERVED"),
+    ));
+    return { cancelled: true, cancellationsRemaining: Math.max(0, 2 - (countRow?.count || 0)) };
+  });
 }
 
 function isUniqueViolation(error: unknown) {
@@ -379,7 +458,7 @@ async function getDeliveryEntries(orderId: string, items: CustomerItem[]): Promi
   return delivered;
 }
 
-export async function getOrderForCustomer(publicToken: string) {
+export async function getOrderForCustomer(publicToken: string, browserKey?: string) {
   if (!db) return null;
   const order = await db.query.orders.findFirst({ where: eq(orders.publicToken, publicToken) });
   if (!order) return null;
@@ -390,6 +469,12 @@ export async function getOrderForCustomer(publicToken: string) {
   const paid = payment?.status === "PAID";
   const delivered = paid ? await getDeliveryEntries(order.id, items) : [];
   const manualDelivery = items.some((row) => row.item.fulfillmentMode === "MANUAL_WHATSAPP");
+  const isOwnerBrowser = Boolean(browserKey && order.browserKey && safeSecretEqual(browserKey, order.browserKey));
+  const cancelled = isOwnerBrowser ? await db.select({ count: sql<number>`count(*)::int` }).from(orders).where(and(
+    eq(orders.browserKey, browserKey!),
+    sql`${orders.customerCancelledAt} is not null`,
+  )) : [];
+  const cancellationsRemaining = Math.max(0, 3 - (cancelled[0]?.count || 0));
   const storePhone = process.env.STORE_WHATSAPP || "";
   const message = `Halo Admin FG Store, pembayaran pesanan saya sudah berhasil dan saya menunggu kode atau URL produk.\n\nOrder: ${order.orderNumber}\nProduk: ${items.map((row) => `${row.item.productName} — ${row.item.variantName}`).join(", ")}\nNama: ${order.buyerName}`;
   return {
@@ -404,6 +489,8 @@ export async function getOrderForCustomer(publicToken: string) {
       paidAt: order.paidAt,
       whatsappUrl: paid && manualDelivery && storePhone ? waLink(storePhone, message) : null,
       emailDeliveryStatus: order.deliveryEmailStatus,
+      canCancel: isOwnerBrowser && order.status === "AWAITING_PAYMENT" && payment?.status === "PENDING" && order.expiresAt > new Date() && cancellationsRemaining > 0,
+      cancellationsRemaining,
     },
     payment: payment ? { status: payment.status, provider: payment.provider, qrImage: payment.qrImage, qrUrl: payment.qrUrl, totalAmount: payment.totalAmount } : null,
     items: items.map((row) => ({ productName: row.item.productName, variantName: row.item.variantName, fulfillmentMode: row.item.fulfillmentMode, price: row.item.price })),

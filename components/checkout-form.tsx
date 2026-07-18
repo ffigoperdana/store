@@ -2,6 +2,7 @@
 
 import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getBrowserCheckoutKey } from "@/lib/browser-checkout";
 
 type CheckoutFormProps = {
   variantId: string;
@@ -28,6 +29,7 @@ export function CheckoutForm({ variantId, price, productName, variantName, requi
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         checkoutKey: checkoutKey.current,
+        browserKey: getBrowserCheckoutKey(),
         variantId,
         buyerName: form.get("buyerName"),
         buyerWhatsapp: form.get("buyerWhatsapp"),
@@ -37,6 +39,10 @@ export function CheckoutForm({ variantId, price, productName, variantName, requi
     const data = await response.json();
     if (!response.ok) {
       checkoutKey.current = null;
+      if (response.status === 409 && data.activeToken) {
+        router.push(`/checkout/${data.activeToken}`);
+        return;
+      }
       setError(data.error || "Checkout gagal.");
       setBusy(false);
       return;

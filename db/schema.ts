@@ -111,6 +111,9 @@ export const orders = pgTable("orders", {
   orderNumber: varchar("order_number", { length: 64 }).notNull().unique(),
   publicToken: varchar("public_token", { length: 96 }).notNull().unique(),
   checkoutKey: varchar("checkout_key", { length: 64 }).unique(),
+  // A random browser-scoped key. It is deliberately not a login/session id;
+  // it only lets the checkout flow enforce one open invoice per browser.
+  browserKey: varchar("browser_key", { length: 64 }),
   buyerName: varchar("buyer_name", { length: 140 }).notNull(),
   buyerWhatsapp: varchar("buyer_whatsapp", { length: 32 }).notNull(),
   buyerEmail: varchar("buyer_email", { length: 320 }),
@@ -122,13 +125,17 @@ export const orders = pgTable("orders", {
   paidAt: timestamp("paid_at", { withTimezone: true }),
   fulfilledAt: timestamp("fulfilled_at", { withTimezone: true }),
   whatsappOpenedAt: timestamp("whatsapp_opened_at", { withTimezone: true }),
+  customerCancelledAt: timestamp("customer_cancelled_at", { withTimezone: true }),
   deliveryEmailStatus: emailDeliveryStatus("delivery_email_status").notNull().default("NOT_REQUESTED"),
   deliveryEmailProviderId: varchar("delivery_email_provider_id", { length: 160 }),
   deliveryEmailSentAt: timestamp("delivery_email_sent_at", { withTimezone: true }),
   deliveryEmailAttempts: integer("delivery_email_attempts").notNull().default(0),
   deliveryEmailLastError: text("delivery_email_last_error"),
   ...timestamps,
-});
+}, (table) => [
+  index("orders_browser_active_idx").on(table.browserKey, table.status, table.expiresAt),
+  index("orders_browser_customer_cancelled_idx").on(table.browserKey, table.customerCancelledAt),
+]);
 
 export const orderItems = pgTable("order_items", {
   id: uuid("id").defaultRandom().primaryKey(),

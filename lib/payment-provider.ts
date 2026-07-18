@@ -35,6 +35,12 @@ function getValue(source: Record<string, unknown>, ...keys: string[]) {
   return undefined;
 }
 
+export function paymentExpiryMilliseconds() {
+  const configured = Number(process.env.PAYMENT_TIMEOUT_MINUTES ?? 60);
+  const minutes = Number.isFinite(configured) ? Math.min(60, Math.max(5, configured)) : 60;
+  return minutes * 60 * 1000;
+}
+
 export async function createPayment(request: PaymentRequest): Promise<PaymentResponse> {
   const provider = process.env.PAYMENT_PROVIDER === "klikqris" ? "klikqris" : "mock";
   if (provider === "mock") {
@@ -49,7 +55,7 @@ export async function createPayment(request: PaymentRequest): Promise<PaymentRes
       requestedAmount: request.amount,
       uniqueAmount: 0,
       totalAmount: request.amount,
-      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+      expiresAt: new Date(Date.now() + paymentExpiryMilliseconds()),
       raw: { mode: "mock", callback_url: request.callbackUrl },
     };
   }
@@ -73,7 +79,7 @@ export async function createPayment(request: PaymentRequest): Promise<PaymentRes
   const data = (raw.data && typeof raw.data === "object" ? raw.data : raw) as Record<string, unknown>;
   const totalAmount = Number(getValue(data, "total_amount", "amount", "total") ?? request.amount);
   const expiresValue = getValue(data, "expired_at", "expires_at", "expiration");
-  const expiresAt = expiresValue ? new Date(String(expiresValue)) : new Date(Date.now() + 15 * 60 * 1000);
+  const expiresAt = expiresValue ? new Date(String(expiresValue)) : new Date(Date.now() + paymentExpiryMilliseconds());
   return {
     provider,
     providerOrderId: String(getValue(data, "order_id", "transaction_id", "reference") ?? request.orderNumber),
@@ -83,7 +89,7 @@ export async function createPayment(request: PaymentRequest): Promise<PaymentRes
     requestedAmount: request.amount,
     uniqueAmount: totalAmount - request.amount,
     totalAmount,
-    expiresAt: Number.isNaN(expiresAt.valueOf()) ? new Date(Date.now() + 15 * 60 * 1000) : expiresAt,
+    expiresAt: Number.isNaN(expiresAt.valueOf()) ? new Date(Date.now() + paymentExpiryMilliseconds()) : expiresAt,
     raw,
   };
 }

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { assertSameOrigin } from "@/lib/auth";
-import { createCheckout, findCheckoutByKey } from "@/lib/orders";
+import { ActiveCheckoutError, createCheckout, findCheckoutByKey } from "@/lib/orders";
 import { enforceCheckoutRateLimit, RateLimitError } from "@/lib/rate-limit";
 
 const payload = z.object({
   checkoutKey: z.string().uuid(),
+  browserKey: z.string().uuid(),
   variantId: z.string().uuid(),
   buyerName: z.string().trim().min(2).max(80),
   buyerWhatsapp: z.string().trim().min(8).max(24),
@@ -23,6 +24,9 @@ export async function POST(request: Request) {
     const order = await createCheckout({ ...body, origin });
     return NextResponse.json(order, { status: order.reused ? 200 : 201 });
   } catch (error) {
+    if (error instanceof ActiveCheckoutError) {
+      return NextResponse.json({ error: error.message, activeToken: error.publicToken }, { status: 409 });
+    }
     if (error instanceof RateLimitError) {
       return NextResponse.json({ error: error.message }, {
         status: 429,

@@ -29,6 +29,13 @@
       "when": 1784391686250,
       "tag": "0003_serious_wild_child",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784406406162,
+      "tag": "0004_fast_power_pack",
+      "breakpoints": true
     }
   ]
 }
