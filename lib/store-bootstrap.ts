@@ -57,6 +57,77 @@ async function ensureVariant(productId: string, input: StarterVariant) {
   return variant;
 }
 
+async function ensureDigitalStarterProducts(demoSharedValue?: string) {
+  if (!db) throw new Error("Database belum terhubung.");
+  const productivity = await ensureCategory({
+    name: "Template & Produktivitas",
+    slug: "template-produktivitas",
+    description: "Template siap pakai untuk belajar dan bekerja.",
+  });
+  const learning = await ensureCategory({
+    name: "E-book & Learning",
+    slug: "ebook-learning",
+    description: "Materi digital, prompt pack, dan panduan belajar.",
+  });
+  const templateProduct = await ensureProduct({
+    categoryId: productivity.id,
+    name: "Notion Mandarin Starter",
+    slug: "notion-mandarin-starter",
+    shortDescription: "Roadmap belajar Mandarin, vocabulary tracker, dan daily practice.",
+    description: "Template Notion terstruktur untuk membantu belajar Mandarin secara konsisten.",
+    featured: true,
+  });
+  const promptProduct = await ensureProduct({
+    categoryId: learning.id,
+    name: "Prompt Pack Produktif",
+    slug: "prompt-pack-produktif",
+    shortDescription: "Kumpulan prompt siap pakai untuk riset, rangkuman, dan produktivitas.",
+    description: "Akses unik ke paket prompt digital FG Store.",
+  });
+  const ebookProduct = await ensureProduct({
+    categoryId: learning.id,
+    name: "E-book Web Design Dasar",
+    slug: "ebook-web-design-dasar",
+    shortDescription: "Panduan praktis membangun tampilan web yang rapi dan responsif.",
+    description: "E-book digital untuk pemula yang ingin memahami fondasi web design.",
+  });
+
+  const templateVariant = await ensureVariant(templateProduct.id, {
+    sku: "NOTION-MND-01",
+    name: "Lifetime Access",
+    price: 100000,
+    compareAtPrice: 129000,
+    duration: "Akses selamanya",
+    fulfillmentMode: "SINGLE_SHARED",
+    sharedDeliveryValue: demoSharedValue,
+    sharedDeliveryLabel: "Buka template Notion",
+  });
+  const promptVariant = await ensureVariant(promptProduct.id, {
+    sku: "PROMPT-PRO-01",
+    name: "Unique Download Link",
+    price: 50000,
+    duration: "Akses unduhan 30 hari",
+    fulfillmentMode: "UNIQUE_POOL",
+  });
+  const ebookVariant = await ensureVariant(ebookProduct.id, {
+    sku: "EBOOK-WEB-01",
+    name: "PDF + Bonus Checklist",
+    price: 75000,
+    fulfillmentMode: "MANUAL_WHATSAPP",
+    estimatedProcess: "Dikirim admin setelah pembayaran",
+  });
+
+  if (demoSharedValue) {
+    await db.update(productVariants).set({
+      sharedDeliveryValue: encryptSecret(demoSharedValue),
+      sharedDeliveryLabel: "Buka template Notion",
+      updatedAt: new Date(),
+    }).where(eq(productVariants.id, templateVariant.id));
+  }
+
+  return { templateProduct, promptProduct, ebookProduct, templateVariant, promptVariant, ebookVariant };
+}
+
 /** Provides a usable first catalogue; disable with AUTO_SEED_CATALOG=false. */
 export async function ensureStarterCatalog() {
   if (!db || process.env.AUTO_SEED_CATALOG === "false") return;
@@ -105,6 +176,7 @@ export async function ensureStarterCatalog() {
       fulfillmentMode: "MANUAL_WHATSAPP",
     }),
   ]);
+  await ensureDigitalStarterProducts();
 }
 
 /**
@@ -117,63 +189,14 @@ export async function ensureDemoData() {
   const sentinel = await db.query.orders.findFirst({ where: eq(orders.orderNumber, "FGS-DEMO-001") });
   if (sentinel) return;
 
-  const productivity = await ensureCategory({
-    name: "Template & Produktivitas",
-    slug: "template-produktivitas",
-    description: "Template siap pakai untuk belajar dan bekerja.",
-  });
-  const learning = await ensureCategory({
-    name: "E-book & Learning",
-    slug: "ebook-learning",
-    description: "Materi digital, prompt pack, dan panduan belajar.",
-  });
-  const templateProduct = await ensureProduct({
-    categoryId: productivity.id,
-    name: "Notion Mandarin Starter",
-    slug: "notion-mandarin-starter",
-    shortDescription: "Roadmap belajar Mandarin, vocabulary tracker, dan daily practice.",
-    description: "Template Notion terstruktur untuk membantu belajar Mandarin secara konsisten.",
-    featured: true,
-  });
-  const promptProduct = await ensureProduct({
-    categoryId: learning.id,
-    name: "Prompt Pack Produktif",
-    slug: "prompt-pack-produktif",
-    shortDescription: "Kumpulan prompt siap pakai untuk riset, rangkuman, dan produktivitas.",
-    description: "Akses unik ke paket prompt digital FG Store.",
-  });
-  const ebookProduct = await ensureProduct({
-    categoryId: learning.id,
-    name: "E-book Web Design Dasar",
-    slug: "ebook-web-design-dasar",
-    shortDescription: "Panduan praktis membangun tampilan web yang rapi dan responsif.",
-    description: "E-book digital untuk pemula yang ingin memahami fondasi web design.",
-  });
-
-  const templateVariant = await ensureVariant(templateProduct.id, {
-    sku: "NOTION-MND-01",
-    name: "Lifetime Access",
-    price: 100000,
-    compareAtPrice: 129000,
-    duration: "Akses selamanya",
-    fulfillmentMode: "SINGLE_SHARED",
-    sharedDeliveryValue: "https://example.com/demo-notion-access",
-    sharedDeliveryLabel: "Buka template Notion",
-  });
-  const promptVariant = await ensureVariant(promptProduct.id, {
-    sku: "PROMPT-PRO-01",
-    name: "Unique Download Link",
-    price: 50000,
-    duration: "Akses unduhan 30 hari",
-    fulfillmentMode: "UNIQUE_POOL",
-  });
-  const ebookVariant = await ensureVariant(ebookProduct.id, {
-    sku: "EBOOK-WEB-01",
-    name: "PDF + Bonus Checklist",
-    price: 75000,
-    fulfillmentMode: "MANUAL_WHATSAPP",
-    estimatedProcess: "Dikirim admin setelah pembayaran",
-  });
+  const {
+    templateProduct,
+    promptProduct,
+    ebookProduct,
+    templateVariant,
+    promptVariant,
+    ebookVariant,
+  } = await ensureDigitalStarterProducts("https://example.com/demo-notion-access");
   const gptProduct = await db.query.products.findFirst({ where: eq(products.slug, "chatgpt-plus") });
   const gptVariants = gptProduct
     ? await db.select().from(productVariants).where(eq(productVariants.productId, gptProduct.id))

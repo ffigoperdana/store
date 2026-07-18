@@ -102,6 +102,7 @@ export async function getPublicCatalog(): Promise<PublicProduct[]> {
     if (row.variant) {
       const variant = row.variant;
       const remaining = variant.fulfillmentMode === "UNIQUE_POOL" ? counts.get(variant.id) ?? 0 : null;
+      const deliveryConfigured = variant.fulfillmentMode !== "SINGLE_SHARED" || Boolean(variant.sharedDeliveryValue);
       current.variants.push({
         id: variant.id,
         sku: variant.sku,
@@ -113,7 +114,7 @@ export async function getPublicCatalog(): Promise<PublicProduct[]> {
         channel: variant.channel,
         estimatedProcess: variant.estimatedProcess,
         fulfillmentMode: variant.fulfillmentMode,
-        available: row.product.availabilityMode === "FORCE_SOLD_OUT" ? false : remaining === null || remaining > 0,
+        available: row.product.availabilityMode !== "FORCE_SOLD_OUT" && deliveryConfigured && (remaining === null || remaining > 0),
         remaining,
       });
     }

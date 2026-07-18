@@ -31,7 +31,7 @@ CHECKOUT_RATE_LIMIT_IP_MAX=12
 CHECKOUT_RATE_LIMIT_PHONE_MAX=5
 ```
 
-`AUTO_SEED_CATALOG=true` hanya memastikan katalog awal ChatGPT tersedia bila database masih kosong. `SEED_DEMO_DATA` wajib tetap `false` (atau tidak diisi) di Coolify; data pembeli dan transaksi contoh hanya ditujukan untuk Docker lokal.
+`AUTO_SEED_CATALOG=true` memastikan katalog awal ChatGPT Plus, Notion Mandarin Starter, E-book Web Design Dasar, dan Prompt Pack Produktif tersedia secara idempotent. Seed ini tidak menimpa perubahan produk yang sudah dikelola admin. `SEED_DEMO_DATA` wajib tetap `false` (atau tidak diisi) di Coolify; URL/stok contoh serta data pembeli dan transaksi palsu hanya ditujukan untuk Docker lokal.
 
 Generate nilai aman, jangan menggunakan contoh `.env.example` di production:
 
