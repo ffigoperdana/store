@@ -52,6 +52,11 @@ export default async function AdminPage() {
 
   return (
     <main className="admin-shell">
+      <header className="admin-commandbar">
+        <div><span className="live-dot" />Store operations</div>
+        <div className="admin-command-actions"><Link href="/" target="_blank">Lihat toko ↗</Link><Link href="/gpt" target="_blank">Halaman GPT ↗</Link></div>
+      </header>
+      <div className="admin-content">
       <aside className="admin-sidebar">
         <Link className="admin-brand" href="/"><b>FG</b><span>FG Store</span><small>Admin console</small></Link>
         <nav className="admin-desktop-nav" aria-label="Navigasi admin">
@@ -67,10 +72,6 @@ export default async function AdminPage() {
       </aside>
 
       <div className="admin-workspace">
-        <header className="admin-commandbar">
-          <div><span className="live-dot" />Store operations</div>
-          <div className="admin-command-actions"><Link href="/" target="_blank">Lihat toko ↗</Link><Link href="/gpt" target="_blank">Halaman GPT ↗</Link></div>
-        </header>
 
         <section className="admin-section admin-overview" id="overview">
           <div className="admin-section-title">
@@ -129,6 +130,7 @@ export default async function AdminPage() {
         </section>
 
         <AdminProductManager />
+      </div>
       </div>
     </main>
   );
