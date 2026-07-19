@@ -18,8 +18,10 @@ const emailLabels: Record<string, string> = {
 };
 
 function remainingLabel(seconds: number) {
-  if (seconds >= 3600) return `${Math.floor(seconds / 3600)}j ${String(Math.floor(seconds % 3600 / 60)).padStart(2, "0")}m`;
-  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 export function OrderPayment({ token }: { token: string }) {
