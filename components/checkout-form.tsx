@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserCheckoutKey } from "@/lib/browser-checkout";
 
@@ -16,7 +16,27 @@ export function CheckoutForm({ variantId, price, productName, variantName, requi
   const router = useRouter();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [activeToken, setActiveToken] = useState<string | null>(null);
+  const [checkingActive, setCheckingActive] = useState(true);
   const checkoutKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const checkActiveCheckout = async () => {
+      try {
+        const browserKey = getBrowserCheckoutKey();
+        const response = await fetch(`/api/checkout/active?browserKey=${encodeURIComponent(browserKey)}`, { cache: "no-store", signal: controller.signal });
+        const data = await response.json();
+        if (response.ok) setActiveToken(data.active?.token || null);
+      } catch (requestError) {
+        if ((requestError as Error).name !== "AbortError") setActiveToken(null);
+      } finally {
+        if (!controller.signal.aborted) setCheckingActive(false);
+      }
+    };
+    void checkActiveCheckout();
+    return () => controller.abort();
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,8 +76,9 @@ export function CheckoutForm({ variantId, price, productName, variantName, requi
     <label>Nomor WhatsApp<input name="buyerWhatsapp" required minLength={8} inputMode="tel" placeholder="0812…" /></label>
     <label>Email <small>{requireEmail ? "(wajib untuk delivery)" : "(opsional)"}</small><input name="buyerEmail" type="email" required={requireEmail} placeholder="email@kamu.com" /></label>
     {requireEmail && <p className="checkout-field-note">Akses akan tampil di halaman pesanan dan dikirim ke email ini setelah pembayaran terverifikasi.</p>}
+    {activeToken && <div className="active-checkout-notice"><strong>Pembayaran aktif masih menunggu.</strong><span>Selesaikan atau tunggu tagihan sebelumnya berakhir sebelum memesan produk lain.</span><button type="button" onClick={() => router.push(`/checkout/${activeToken}`)}>Lanjutkan pembayaran aktif →</button></div>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    <button className="store-button store-button-primary" disabled={busy}>{busy ? "Membuat tagihan…" : "Lanjut ke pembayaran"}</button>
+    <button className="store-button store-button-primary" disabled={busy || checkingActive || Boolean(activeToken)}>{busy ? "Membuat tagihan…" : checkingActive ? "Memeriksa pembayaran aktif…" : activeToken ? "Selesaikan pembayaran aktif dulu" : "Lanjut ke pembayaran"}</button>
     <p className="checkout-note">Status pesanan diperbarui dari callback pembayaran. Jangan kirim bukti bayar untuk mengaktifkan akses.</p>
   </form>;
 }

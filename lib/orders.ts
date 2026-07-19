@@ -460,8 +460,19 @@ async function getDeliveryEntries(orderId: string, items: CustomerItem[]): Promi
 
 export async function getOrderForCustomer(publicToken: string, browserKey?: string) {
   if (!db) return null;
-  const order = await db.query.orders.findFirst({ where: eq(orders.publicToken, publicToken) });
+  let order = await db.query.orders.findFirst({ where: eq(orders.publicToken, publicToken) });
   if (!order) return null;
+  // An older pending order did not yet have a browser key. Its customer URL is
+  // deliberately unguessable, so the first browser opening it can safely claim
+  // the checkout guard without exposing customer information elsewhere.
+  if (browserKey && !order.browserKey && order.status === "AWAITING_PAYMENT" && order.expiresAt > new Date()) {
+    const [claimed] = await db.update(orders).set({ browserKey, updatedAt: new Date() }).where(and(
+      eq(orders.id, order.id),
+      sql`${orders.browserKey} is null`,
+    )).returning();
+    if (claimed) order = claimed;
+    else order = await db.query.orders.findFirst({ where: eq(orders.id, order.id) }) || order;
+  }
   const [payment, items] = await Promise.all([
     db.query.payments.findFirst({ where: eq(payments.orderId, order.id) }),
     db.select({ item: orderItems, variant: productVariants }).from(orderItems).leftJoin(productVariants, eq(orderItems.variantId, productVariants.id)).where(eq(orderItems.orderId, order.id)),
